@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover lets the app paint under the notch; safe-area insets pad the content back in.
+     maximum-scale=1 + user-scalable=no stop accidental pinch/double-tap zoom on iOS. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Holo">
+<meta name="theme-color" content="#03050a">
+<meta name="color-scheme" content="dark">
+<title>Holo Timer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<!-- Fixed backdrop: gradient, star field and perspective floor grid (the timer screen is see-through). -->
+<div id="backdrop" aria-hidden="true"></div>
+
+<main id="app">
+  <section class="screen" id="screen-timer" aria-label="Timer"></section>
+  <section class="screen" id="screen-data" aria-label="Data" hidden></section>
+  <section class="screen" id="screen-missions" aria-label="Completed missions" hidden></section>
+  <section class="screen" id="screen-settings" aria-label="Settings" hidden></section>
+</main>
+
+<!-- Scanline + vignette overlay (toggle in Settings › Look). Never intercepts taps. -->
+<div id="scanlines" aria-hidden="true"></div>
+<div id="toast-host" aria-live="polite"></div>
+
+<noscript><p style="color:#cfeeff;padding:40px;font-family:sans-serif">Holo Timer needs JavaScript.</p></noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
