@@ -117,7 +117,11 @@ export function render(root, ctx) {
   attachSwipe(root.querySelector('.grid-wrap'), ctx);
 }
 
-/** Swipe the grid left/right to move between periods (prev/next buttons do the same). */
+/**
+ * Swipe across the grid to switch views: right → the next-smaller scope (Year → Month → Week → Day),
+ * left → the next-bigger one (Day → Week → …). Stops at the ends. To move within a scope
+ * (e.g. 2026 → 2025), use the arrows at the top.
+ */
 function attachSwipe(el, ctx) {
   let x0 = null;
   let y0 = null;
@@ -127,8 +131,8 @@ function attachSwipe(el, ctx) {
     const dx = e.changedTouches[0].clientX - x0;
     const dy = e.changedTouches[0].clientY - y0;
     x0 = null;
-    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return;
-    if (dx > 0) ctx.go('data', { offset: ctx.ui.offset - 1 });
-    else if (ctx.ui.offset < 0) ctx.go('data', { offset: ctx.ui.offset + 1 });
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return; // a tap or a vertical scroll, not a swipe
+    const i = SCOPES.indexOf(ctx.ui.scope) + (dx > 0 ? -1 : 1);
+    if (i >= 0 && i < SCOPES.length) ctx.go('data', { scope: SCOPES[i] });
   }, { passive: true });
 }

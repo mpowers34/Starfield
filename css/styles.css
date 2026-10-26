@@ -147,7 +147,8 @@ body.no-scanlines #scanlines { background: radial-gradient(ellipse at 50% 45%, t
 @keyframes chip-pulse { 50% { box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 35%, transparent); } }
 
 /* Filter chips on data views: each outlined in its own tag color. */
-.chip.filter { height: 48px; border-width: 1.5px; }
+.chip.filter { height: 40px; min-width: 0; padding: 0 12px; gap: 6px; border-radius: 12px; border-width: 1.5px; font-size: 13px; }
+.chip.filter svg { width: 13px; height: 13px; }
 .chip.filter[aria-pressed="false"] { border-color: rgba(143, 167, 189, .2) !important; background: transparent !important; opacity: .45; }
 
 /* ---------- Timer screen ---------- */
@@ -250,8 +251,11 @@ body.reduce-motion .paused .digits, body.reduce-motion .chips.pick .chip { anima
 .chart { display: block; width: 100%; height: auto; margin-top: 2px; }
 
 .foot { flex: none; }
-.foot .label { margin: 8px 0; }
-.tabbar { display: flex; gap: 4px; margin-top: 12px; padding: 4px; height: 52px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); }
+/* Data views: the tab bar sits just above the home indicator (like a native tab bar), which
+   frees space for Mission Data. */
+#screen-data { padding-bottom: max(12px, calc(var(--safe-b) - 6px)); }
+.foot .label { margin: 6px 0; }
+.tabbar { display: flex; gap: 4px; margin-top: 10px; padding: 4px; height: 52px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); }
 .tabbar button { flex: 1; border: 0; border-radius: 12px; background: transparent; color: var(--text); font-family: var(--display); font-size: 14px; font-weight: 500; cursor: pointer; }
 .tabbar button.timer { color: var(--bright); }
 .tabbar button[aria-current="page"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
@@ -304,4 +308,4 @@ body.reduce-motion .paused .digits, body.reduce-motion .chips.pick .chip { anima
 
 /* Short screens: give Mission Data room by shrinking the star grid a little. */
 @media (max-height: 760px) { .grid-svg { max-width: 330px; } }
-@media (max-height: 680px) { .grid-svg { max-width: 280px; } .tabbar { height: 46px; margin-top: 8px; } .chip.filter { height: 42px; } }
+@media (max-height: 680px) { .grid-svg { max-width: 280px; } .tabbar { height: 46px; margin-top: 8px; } .chip.filter { height: 36px; } }
