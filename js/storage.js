@@ -149,10 +149,10 @@ function applyEvent(e) {
       state.settings[p.key] = p.value;
       break;
     case 'session_started':
-      S.set(e.entity_id, { id: e.entity_id, tag_id: p.tag_id, planned_minutes: p.planned_minutes ?? null, started_at: p.started_at || e.occurred_at, ended_at: null, pauses: [], deleted_at: null, device_id: e.device_id, created_at: e.occurred_at });
+      S.set(e.entity_id, { id: e.entity_id, tag_id: p.tag_id, planned_minutes: p.planned_minutes ?? null, started_at: p.started_at || e.occurred_at, ended_at: null, pauses: [], deleted_at: null, device_id: e.device_id, created_at: e.occurred_at, notes: [] });
       break;
     case 'session_logged': // a complete past session in one event (demo data, manual entry, imports from other apps)
-      S.set(e.entity_id, { id: e.entity_id, tag_id: p.tag_id, planned_minutes: p.planned_minutes ?? null, started_at: p.started_at, ended_at: p.ended_at, pauses: p.pauses || [], deleted_at: null, device_id: e.device_id, created_at: e.occurred_at, manual: !!p.manual });
+      S.set(e.entity_id, { id: e.entity_id, tag_id: p.tag_id, planned_minutes: p.planned_minutes ?? null, started_at: p.started_at, ended_at: p.ended_at, pauses: p.pauses || [], deleted_at: null, device_id: e.device_id, created_at: e.occurred_at, manual: !!p.manual, notes: [] });
       break;
     case 'session_paused':
       if (s && !s.ended_at && !openPause(s)) s.pauses.push({ start: p.at || e.occurred_at, end: null });
@@ -190,6 +190,9 @@ function applyEvent(e) {
       break;
     case 'session_restored': // Undo delete
       if (s) s.deleted_at = null;
+      break;
+    case 'session_note_added': // a timestamped note about what you're working on
+      if (s) s.notes.push({ id: p.note_id, text: p.text, at: p.at || e.occurred_at });
       break;
     default:
       // Unknown types (from a newer app version) are kept in the log and ignored here.
@@ -297,6 +300,23 @@ export function retagSession(id, tagId) {
 }
 
 export function deleteSession(id) { append(makeEvent('session_deleted', id, {})); }
+/**
+ * Log a note on a session. Notes are timestamped so they can be analysed later; one logged in
+ * the session's first minute is stamped at the session's start (you're describing what you
+ * set out to do). Returns the note.
+ */
+export function addNote(sessionId, text) {
+  const s = state.sessions.get(sessionId);
+  const t = String(text || '').trim().slice(0, 500);
+  if (!s || !t) return null;
+  const now = Date.now();
+  const start = Date.parse(s.started_at);
+  const at = now - start < 60_000 ? s.started_at : new Date(now).toISOString();
+  const noteId = uuid();
+  append(makeEvent('session_note_added', sessionId, { note_id: noteId, text: t, at }));
+  return { id: noteId, text: t, at };
+}
+
 export function restoreSession(id) { append(makeEvent('session_restored', id, {})); }
 
 /** Add a finished session by hand (e.g. you forgot to start the timer). Returns the session. */

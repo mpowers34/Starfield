@@ -55,6 +55,11 @@ function byHour(d) {
 
 const PENCIL = '<svg class="pencil" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M9.6 2.2l2.2 2.2-7 7H2.6V9.2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
 
+/** A session's notes, each with its time, shown under its row. */
+const notesList = (s) => (s.notes && s.notes.length
+  ? `<div class="sess-notes">${s.notes.map((n) => `<div><b>${fmtTime(new Date(n.at))}</b>${esc(n.text)}</div>`).join('')}</div>`
+  : '');
+
 const daySessions = {
   id: 'day-sessions',
   title: 'HOUR BY HOUR · SESSIONS',
@@ -68,7 +73,7 @@ const daySessions = {
       const open = ed.open === s.id;
       return `<button type="button" class="lrow sess${open ? ' open' : ''}" data-edit-session="${s.id}" aria-expanded="${open}" aria-label="Edit ${esc(tagName(d, s))} session, ${range}">${starIcon(tagColor(d, s), ms / MIN, { ring: live })}
         <div class="grow"><div class="name">${esc(tagName(d, s))}</div><div class="meta">${range}</div></div>
-        ${live ? '<span class="pill">LIVE</span>' : ''}<div class="val">${fmtHM(ms)}</div>${PENCIL}</button>${open ? d.renderEditor() : ''}`;
+        ${live ? '<span class="pill">LIVE</span>' : ''}<div class="val">${fmtHM(ms)}</div>${PENCIL}</button>${notesList(s)}${open ? d.renderEditor() : ''}`;
     }).join('');
     const none = d.sessions.length ? '' : empty(d.isCurrent ? 'NO STARS YET TODAY · START ONE FROM THE TIMER' : 'NO FOCUS THIS DAY');
     const adding = ed.open === 'new';

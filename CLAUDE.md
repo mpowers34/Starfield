@@ -13,6 +13,7 @@ He is not a coder: he describes changes in plain English; Claude edits, tests, a
 ## Never
 - Touch user data shape without a migration: data is an append-only event log in IndexedDB (`js/storage.js`).
 - Add pop-ups, modals, or reward screens (ADHD: rewards must never slow him down).
-- Make Start take more than one tap.
+- Make Start take more than one tap when a tag is already selected. (v0.3, Michael's call: the tag row
+  starts with nothing selected; Start with no tag asks for one, and tapping a chip then starts.)
 
 See README.md for architecture and design decisions.

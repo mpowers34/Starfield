@@ -57,7 +57,6 @@ export function render(root, ctx) {
     <div class="label-cyan set-group">TIMER</div>
     ${row('Default length', 'Starts every new session at this', `<div class="seg" role="group" aria-label="Default length">${LENGTHS.map((m) => `<button type="button" data-len="${m}" aria-pressed="${s.default_minutes === m && !s.count_up}">${m}</button>`).join('')}</div>`)}
     ${row('Count up instead', 'No fixed length, stop whenever', sw('count_up', s.count_up, 'Count up instead'))}
-    ${row('Ask for a tag before starting', 'Otherwise reuses the last tag', sw('ask_tag_first', s.ask_tag_first, 'Ask for a tag before starting'))}
     ${row('Sound &amp; haptics at end', 'A soft chime when the countdown hits zero', sw('sound_haptics', s.sound_haptics, 'Sound and haptics at end'), true)}
 
     <div class="label-cyan set-group">TAGS · STARS</div>

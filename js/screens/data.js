@@ -5,7 +5,6 @@
 import { period, fmtHM, fmtDayLabel, MON, MON_LONG, addDays, MIN, esc } from '../util.js';
 import { renderGrid, chipStar } from '../stars.js';
 import { CARDS } from '../metrics.js';
-import { hasNew } from '../missions.js';
 import { ICONS, onSwipe } from '../ui.js';
 import * as sessionEditor from '../sessionEditor.js';
 
@@ -67,7 +66,6 @@ export function render(root, ctx) {
   const sc = root.querySelector('.scroll');
   const keep = sc && root.dataset.view === `${scope}|${ui.offset}` ? sc.scrollTop : 0;
   const chipsLeft = root.querySelector('.chips')?.scrollLeft || 0;
-  const newDot = hasNew(storage);
 
   root.dataset.view = `${scope}|${ui.offset}`;
   root.innerHTML = `
@@ -77,7 +75,6 @@ export function render(root, ctx) {
       <div class="label">${periodLabel(p, ui.offset)}</div>
       <div class="row">
         <div class="total">${fmtHM(total)}</div>
-        <button type="button" class="hex-badge" data-act="missions" aria-label="Completed missions${newDot ? ', something new' : ''}">${ICONS.hex}${newDot ? '<span class="dot"></span>' : ''}</button>
       </div>
       ${scope === 'day' ? goalArc(total, set.daily_goal_minutes) : ''}
     </div>
@@ -114,7 +111,6 @@ export function render(root, ctx) {
     switch (b.dataset.act) {
       case 'prev': ctx.go('data', { offset: ui.offset - 1 }); break;
       case 'next': if (ui.offset < 0) ctx.go('data', { offset: ui.offset + 1 }); break;
-      case 'missions': ctx.go('missions'); break;
       case 'timer': ctx.go('timer'); break;
       default: break;
     }

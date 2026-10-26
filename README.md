@@ -44,6 +44,13 @@ icons/                  app icons (icon.svg is the source)
 - **Editing sessions.** On the Day view, tap a session to change its tag, start or end (or delete
   it, with Undo); "+ Add session" logs one you forgot to time. Edits are events too, so they sync.
   Stars take grid slots in creation order, so adding or editing never reshuffles the grid.
+- **Tags on the timer** start unselected. Pick one and Start begins at once; tap Start with none
+  and it asks for one (tap a chip to start, or "Start without tag"). The "+" at the end of the
+  row adds a tag inline.
+- **Notes.** While a session runs, tap NOTES under the count, type, Submit. Each note is its own
+  timestamped event (`session_note_added`); notes in the first minute are stamped at the start.
+  They show under the session on the Day view.
+- **Completed Missions** opens from the hex badge between Settings and Data on the timer.
 - **Swipes** follow the tab bar order: Timer ← Day ← Week ← Month ← Year.
 - **Grid tilt** is one number: `ELEVATION` in `js/stars.js` (v0.2: 51.6°).
 - **No pop-ups anywhere.** Erase uses tap-twice; tag edits are inline.

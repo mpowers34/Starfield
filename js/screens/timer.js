@@ -9,23 +9,29 @@
 
 import { fmtHM, fmtClock, fmtTime, fmtDayLabel, startOfDay, addDays, MIN, esc, clamp } from '../util.js';
 import { chipStar, starBody, starOpacity } from '../stars.js';
-import { showToast, onSwipe } from '../ui.js';
+import { showToast, onSwipe, ICONS } from '../ui.js';
+import { hasNew } from '../missions.js';
 
 const RING_C = 2 * Math.PI * 118; // progress ring circumference (r = 118)
-let picking = false; // "Ask for a tag before starting": waiting for a chip tap
-let pickTimer = null;
+let selectedTag = null; // tag chosen before Start (none by default; resets after each session)
+let picking = false; // Start was tapped with no tag selected: waiting for a chip tap
+let addingTag = false; // the "+" chip is showing a name field
+let renderPending = false; // a re-render was skipped because you were typing
 let chimedFor = null; // session id we already chimed for at zero
 let lastText = {}; // cache to avoid touching the DOM when nothing changed
 
 // ---------- Helpers ----------
 
+/** The tag shown as selected: the live session's tag, or whatever you picked before Start (maybe none). */
 function currentTag(ctx) {
   const { storage } = ctx;
-  const tags = storage.listTags();
   const active = storage.getActiveSession();
-  const id = active ? active.tag_id : storage.getSettings().last_tag_id;
-  return tags.find((t) => t.id === id) || tags[0] || null;
+  const id = active ? active.tag_id : selectedTag;
+  return (id && storage.getTag(id)) || null;
 }
+
+/** True while you're typing in a field on this screen; re-renders wait so the keyboard isn't dismissed. */
+const typing = () => { const a = document.activeElement; return !!(a && a.tagName === 'INPUT' && a.closest('#screen-timer')); };
 
 function todayMs(storage, now) {
   const from = startOfDay(new Date(now));
@@ -55,7 +61,7 @@ function texts(m, ctx, now) {
   const t = {};
   if (m.mode === 'idle') {
     t.digits = m.planned ? fmtClock(m.planned) : '00:00';
-    t.of = picking ? 'PICK A TAG BELOW' : m.planned ? 'READY' : 'COUNT UP · READY';
+    t.of = picking ? 'PICK A TAG TO START' : m.planned ? 'READY' : 'COUNT UP · READY';
     t.lLab = m.planned ? 'LENGTH' : 'MODE';
     t.lVal = m.planned ? `${set.default_minutes} MIN` : 'OPEN';
     t.rLab = m.planned ? 'ENDS AT' : 'DAILY GOAL';
@@ -113,7 +119,7 @@ function projectorSVG(m, t, tag, ctx, now) {
   const len = (RING_C * (m.over ? 1 : m.frac)).toFixed(1);
   const ang = (m.over ? 1 : m.frac) * 2 * Math.PI;
   const dot = { x: 175 + 118 * Math.sin(ang), y: 210 - 118 * Math.cos(ang) };
-  const name = tag ? tag.name.toUpperCase() : 'UNTAGGED';
+  const name = tag ? tag.name.toUpperCase() : live ? 'UNTAGGED' : 'SELECT A TAG';
   const nameW = name.length * 10.6;
   const tagCol = tag ? tag.color : '#8fa7bd';
   const aria = live
@@ -182,6 +188,8 @@ const ICON = {
 };
 
 export function render(root, ctx) {
+  if (typing() && root.childElementCount) { renderPending = true; return; } // finish typing first
+  renderPending = false;
   const { storage } = ctx;
   const now = Date.now();
   const set = storage.getSettings();
@@ -190,17 +198,24 @@ export function render(root, ctx) {
   const tag = currentTag(ctx);
   const tags = storage.listTags();
   const chipsScroll = root.querySelector('.chips')?.scrollLeft || 0;
+  const newDot = hasNew(storage);
 
-  const chips = tags.map((tg) => `<button type="button" class="chip" data-tag="${tg.id}" aria-pressed="${tag && tg.id === tag.id}">${chipStar(tg.color)}${esc(tg.name)}</button>`).join('');
+  const chips = tags.map((tg) => `<button type="button" class="chip" data-tag="${tg.id}" aria-pressed="${!!tag && tg.id === tag.id}">${chipStar(tg.color)}${esc(tg.name)}</button>`).join('')
+    + (addingTag
+      ? '<label class="chip add-tag-field"><input type="text" data-new-tag maxlength="20" placeholder="Tag name" enterkeyhint="done" autocomplete="off" aria-label="New tag name"></label>'
+      : '<button type="button" class="chip add-tag" data-act="add-tag" aria-label="New tag">' + ICONS.plus + '</button>');
 
   const controls = m.mode === 'idle'
-    ? `<button type="button" class="btn-main" data-act="start">${ICON.start}Start<span class="len">${set.count_up ? 'COUNT UP' : `${set.default_minutes}:00`}</span></button>`
+    ? (picking
+      ? `<button type="button" class="btn-main quiet" data-act="start-untagged">${ICON.start}Start without tag</button>`
+      : `<button type="button" class="btn-main" data-act="start">${ICON.start}Start<span class="len">${set.count_up ? 'COUNT UP' : `${set.default_minutes}:00`}</span></button>`)
     : `<button type="button" class="btn-pause" data-act="${m.mode === 'paused' ? 'resume' : 'pause'}" aria-label="${m.mode === 'paused' ? 'Resume session' : 'Pause session'}">${m.mode === 'paused' ? ICON.play : ICON.pause}</button>
        <button type="button" class="btn-main" data-act="end">${ICON.stop}End session</button>`;
 
   root.innerHTML = `
   <div class="top-row">
     <button type="button" class="btn-top" data-act="settings" aria-label="Open settings">${ICON.gear}SETTINGS</button>
+    <button type="button" class="hex-badge" data-act="missions" aria-label="Completed missions${newDot ? ', something new' : ''}">${ICONS.hex}${newDot ? '<span class="dot"></span>' : ''}</button>
     <button type="button" class="btn-top" data-act="data" aria-label="Open data views">${ICON.bars}DATA${ICON.chev}</button>
   </div>
   <div class="today">
@@ -208,24 +223,115 @@ export function render(root, ctx) {
     <div class="total" id="t-total">${fmtHM(todayMs(storage, now))}</div>
     <div class="date">${fmtDayLabel(new Date(now))}</div>
   </div>
-  ${projectorSVG(m, t, tag, ctx, now)}
+  <div class="projector-wrap">
+    ${projectorSVG(m, t, tag, ctx, now)}
+    ${m.mode === 'idle' ? '' : notesHTML(m.s)}
+  </div>
   <div class="chips${picking ? ' pick' : ''}" role="group" aria-label="Tag">${chips}</div>
   <div class="actions">${controls}</div>`;
 
   const ch = root.querySelector('.chips');
-  if (ch) ch.scrollLeft = chipsScroll;
+  if (ch) ch.scrollLeft = addingTag ? ch.scrollWidth : chipsScroll;
   lastText = { ...t, mode: m.mode, total: root.querySelector('#t-total').textContent };
   root.onclick = (e) => onClick(e, ctx);
-  // Swipe left anywhere on the timer (except the tag row and buttons) to open the Day view,
+  root.onkeydown = (e) => onKey(e, ctx);
+  root.onfocusout = (e) => onBlur(e, ctx);
+  root.onsubmit = (e) => { e.preventDefault(); submitNote(ctx); };
+  // Swipe left anywhere on the timer (except the tag row, buttons and notes) to open the Day view,
   // mirroring the tab bar order: Timer | Day | Week | Month | Year.
-  onSwipe(root, (dir) => { if (dir === 'left') ctx.go('data', { scope: 'day', offset: 0 }); }, { ignore: '.chips, button' });
+  onSwipe(root, (dir) => { if (dir === 'left') ctx.go('data', { scope: 'day', offset: 0 }); }, { ignore: '.chips, button, .notes' });
+  layoutNotes(root);
+}
+
+// ---------- Notes ----------
+// While a session runs, a "Notes" field sits inside the ring under the count. Tap it, type what
+// you're working on, Submit: the note is logged with a timestamp and the field stays, ready for
+// the next one (e.g. when you switch to a different task within the same subject).
+
+function notesHTML(session) {
+  const notes = session.notes || [];
+  const last = notes[notes.length - 1];
+  return `<form class="notes" data-notes autocomplete="off">
+    <button type="button" class="notes-pill" data-act="open-note" aria-label="Add a note${notes.length ? `, ${notes.length} logged` : ''}">
+      <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M9.6 2.2l2.2 2.2-7 7H2.6V9.2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      <span class="notes-text${last ? '' : ' empty'}">${last ? esc(last.text) : 'NOTES'}</span>${notes.length ? `<span class="notes-count">${notes.length}</span>` : ''}
+    </button>
+    <div class="notes-edit">
+      <input type="text" data-note-input maxlength="500" placeholder="What are you working on?" enterkeyhint="send" aria-label="Note">
+      <button type="submit" class="btn-pill solid">SUBMIT</button>
+    </div>
+  </form>`;
+}
+
+/** Place the notes field inside the ring, just under "OF 45:00", whatever size the projector is drawn at. */
+function layoutNotes(root) {
+  const wrap = root.querySelector('.projector-wrap');
+  const notes = wrap && wrap.querySelector('.notes');
+  if (!notes) return;
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  const sc = Math.min(W / 350, H / 490); // the SVG is scaled to fit and centred
+  const offX = (W - 350 * sc) / 2;
+  const offY = (H - 490 * sc) / 2;
+  notes.style.setProperty('--cx', `${offX + 175 * sc}px`);
+  notes.style.top = `${offY + 274 * sc}px`;
+  notes.style.setProperty('--pill-w', `${Math.max(140, 172 * sc)}px`);
+  if (!wrap._ro) { wrap._ro = new ResizeObserver(() => layoutNotes(root)); wrap._ro.observe(wrap); }
+}
+
+function openNote(root) {
+  const form = root.querySelector('[data-notes]');
+  if (!form) return;
+  form.classList.add('editing');
+  form.querySelector('[data-note-input]').focus(); // same tap, so iOS raises the keyboard
+}
+
+function submitNote(ctx) {
+  const root = document.getElementById('screen-timer');
+  const input = root.querySelector('[data-note-input]');
+  const active = ctx.storage.getActiveSession();
+  if (!input || !active) return;
+  const note = ctx.storage.addNote(active.id, input.value);
+  input.value = '';
+  input.blur(); // closes the keyboard; the field stays, showing your latest note
+  if (note) showToast('NOTE LOGGED', { ms: 1800 });
+}
+
+// ---------- New tag from the tag row ----------
+
+function createTagFrom(input, ctx) {
+  const name = input.value.trim();
+  addingTag = false;
+  if (!name) { render(document.getElementById('screen-timer'), ctx); return; }
+  const t = ctx.storage.saveTag({ name });
+  selectTag(t.id, ctx); // treat it as if you'd tapped the new chip
+}
+
+function onKey(e, ctx) {
+  if (e.key === 'Enter' && e.target.matches('[data-new-tag]')) { e.preventDefault(); const i = e.target; i.dataset.done = '1'; i.blur(); createTagFrom(i, ctx); }
+  if (e.key === 'Escape' && e.target.matches('[data-new-tag]')) { addingTag = false; e.target.dataset.done = '1'; e.target.blur(); render(document.getElementById('screen-timer'), ctx); }
+}
+
+function onBlur(e, ctx) {
+  const root = document.getElementById('screen-timer');
+  if (e.target.matches('[data-new-tag]') && !e.target.dataset.done) { e.target.dataset.done = '1'; setTimeout(() => createTagFrom(e.target, ctx), 0); return; }
+  if (e.target.matches('[data-note-input]')) {
+    // Leaving the field without submitting keeps what you typed in the box but folds it away.
+    setTimeout(() => {
+      const form = root.querySelector('[data-notes]');
+      if (form && !form.contains(document.activeElement)) form.classList.remove('editing');
+      if (renderPending && !typing()) render(root, ctx);
+    }, 120);
+    return;
+  }
+  if (renderPending) setTimeout(() => { if (!typing()) render(root, ctx); }, 0);
 }
 
 /** Cheap per-tick update: only text and the ring move. Re-render fully when the state changes. */
 export function tick(now, ctx) {
   const root = document.getElementById('screen-timer');
   const m = model(ctx, now);
-  if (m.mode !== lastText.mode) { render(root, ctx); return; }
+  if (m.mode !== lastText.mode && !typing()) { render(root, ctx); return; }
   // Countdown just reached zero: chime once, keep running into overtime.
   if (m.over && m.s && chimedFor !== m.s.id) {
     chimedFor = m.s.id;
@@ -234,7 +340,7 @@ export function tick(now, ctx) {
   }
   const t = texts(m, ctx, now);
   const set = (id, v) => { const el = root.querySelector(id); if (el && el.textContent !== v) el.textContent = v; };
-  if (t.digits.length !== lastText.digits.length || t.lLab !== lastText.lLab) { render(root, ctx); return; }
+  if ((t.digits.length !== lastText.digits.length || t.lLab !== lastText.lLab) && !typing()) { render(root, ctx); return; }
   set('#t-dig', t.digits); set('#t-dig-ghost', t.digits);
   set('#t-of', t.of); set('#t-l-val', t.lVal); set('#t-r-val', t.rVal);
   set('#t-total', fmtHM(todayMs(ctx.storage, now)));
@@ -260,26 +366,25 @@ function onClick(e, ctx) {
   const act = btn.dataset.act;
   const active = storage.getActiveSession();
 
-  if (btn.dataset.tag) {
-    const tagId = btn.dataset.tag;
-    if (active) { if (active.tag_id !== tagId) storage.retagSession(active.id, tagId); }
-    else if (picking) { start(ctx, tagId); }
-    else storage.setSetting('last_tag_id', tagId);
-    return;
-  }
+  if (btn.dataset.tag) { selectTag(btn.dataset.tag, ctx); return; }
   switch (act) {
     case 'settings': ctx.go('settings'); break;
     case 'data': ctx.go('data'); break;
-    case 'start': {
-      // With "ask for a tag" on, the first tap asks; a second tap (or 8 s) starts anyway. Never blocks.
-      if (storage.getSettings().ask_tag_first && !picking) {
-        picking = true;
-        clearTimeout(pickTimer);
-        pickTimer = setTimeout(() => { if (picking) start(ctx, null); }, 8000);
-        ctx.rerender();
-      } else start(ctx, null);
+    case 'missions': ctx.go('missions'); break;
+    case 'start':
+      // A tag picked beforehand → start now. No tag → ask for one (tap a chip to start).
+      if (selectedTag && storage.getTag(selectedTag)) start(ctx, selectedTag);
+      else { picking = true; ctx.rerender(); }
+      break;
+    case 'start-untagged': start(ctx, null); break;
+    case 'add-tag': {
+      addingTag = true;
+      const root = document.getElementById('screen-timer');
+      render(root, ctx);
+      root.querySelector('[data-new-tag]')?.focus(); // same tap, so iOS raises the keyboard
       break;
     }
+    case 'open-note': openNote(document.getElementById('screen-timer')); break;
     case 'pause': if (active) storage.pauseSession(active.id); break;
     case 'resume': if (active) storage.resumeSession(active.id); break;
     case 'end': if (active) end(ctx, active); break;
@@ -287,12 +392,22 @@ function onClick(e, ctx) {
   }
 }
 
+/** Tapping a chip: retag a live session; while asked for a tag, start; otherwise select/deselect it. */
+function selectTag(tagId, ctx) {
+  const { storage } = ctx;
+  const active = storage.getActiveSession();
+  if (active) { if (active.tag_id !== tagId) storage.retagSession(active.id, tagId); else ctx.rerender(); return; }
+  if (picking) { start(ctx, tagId); return; }
+  selectedTag = selectedTag === tagId ? null : tagId;
+  ctx.rerender();
+}
+
 function start(ctx, tagId) {
   const { storage } = ctx;
   picking = false;
-  clearTimeout(pickTimer);
+  selectedTag = null; // the next session starts with no tag selected again
   const set = storage.getSettings();
-  const tag = tagId ? storage.getTag(tagId) : currentTag(ctx);
+  const tag = tagId ? storage.getTag(tagId) : null;
   unlockAudio();
   storage.startSession({ tagId: tag ? tag.id : null, plannedMinutes: set.count_up ? null : set.default_minutes });
   haptic();

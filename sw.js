@@ -5,7 +5,7 @@
 // notices the new worker, it installs, takes over, and app.js reloads the page once so the new
 // files show up straight away.
 
-const VERSION = 'holo-v0.2.0';
+const VERSION = 'holo-v0.3.0';
 const FILES = [
   './',
   'index.html',
