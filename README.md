@@ -18,6 +18,7 @@ js/metrics.js           Mission Data cards (add new metrics here: write a card, 
 js/missions.js          the 12 medals, computed from sessions
 js/demo.js              "Load demo data"
 js/ui.js                undo toast, icons
+js/version.js           app version shown in Settings (bump with sw.js VERSION)
 js/screens/*.js         timer, data (Day/Week/Month/Year), missions, settings
 fonts/                  Chakra Petch + IBM Plex Mono (OFL), self-hosted for offline
 icons/                  app icons (icon.svg is the source)
@@ -75,8 +76,9 @@ install offline). GitHub Pages is the simplest free option:
 On the Mac: open the same URL in Safari and use **File › Add to Dock** (or Chrome's install button).
 The Mac and iPhone keep **separate** data until sync exists; use Export/Import to move data between them.
 
-**Updating later:** upload the changed files and bump `VERSION` in `sw.js`. The app picks up the new
-version the next time it's opened (sometimes the launch after that).
+**Updating later:** Claude pushes changes straight to this repo. After it says a change is live,
+fully close the app on your phone and reopen it; the new version loads on that first reopen.
+The version number at the bottom of Settings tells you which version you're on.
 
 **Backups:** data lives only on the device until sync exists. Export now and then. Home Screen apps
 aren't subject to Safari's 7-day cleanup of website data, but deleting the icon deletes its data.

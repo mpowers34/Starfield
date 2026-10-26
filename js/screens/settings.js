@@ -9,6 +9,7 @@ import { starIcon } from '../stars.js';
 import { TAG_COLORS } from '../storage.js';
 import { ICONS, showToast } from '../ui.js';
 import { loadDemo } from '../demo.js';
+import { APP_VERSION } from '../version.js';
 
 const ACCENTS = ['#ffb84a', '#5ad7ff', '#ff9db8', '#8be9a8'];
 const LENGTHS = [25, 45, 60, 90];
@@ -78,7 +79,7 @@ export function render(root, ctx) {
     ${row('Import data', 'Merges a JSON export (no duplicates)', '<button type="button" class="btn-pill" data-act="import">IMPORT</button><input type="file" accept="application/json,.json" data-import hidden>')}
     ${row('Load demo data', 'A realistic year of sessions, for trying things out', '<button type="button" class="btn-pill" data-act="demo">LOAD</button>')}
     ${row('Erase everything on this device', eraseArmed ? 'Tap again to confirm' : 'Cannot be undone', `<button type="button" class="btn-pill danger" data-act="erase">${eraseArmed ? 'TAP AGAIN' : 'ERASE'}</button>`, true)}
-    <div class="version">HOLO-TABLE · VERSION 0.1 · PROTOTYPE</div>
+    <div class="version">HOLO-TABLE · VERSION ${APP_VERSION}</div>
   </div>`;
 
   root.querySelector('.scroll').scrollTop = keep;

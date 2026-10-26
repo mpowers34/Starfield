@@ -1,10 +1,11 @@
 // sw.js — offline support. The whole app is a handful of static files, so we precache all of
 // them and serve cache-first. Your data lives in IndexedDB, which the service worker never touches.
 //
-// Releasing a change: bump VERSION. The new worker installs in the background, takes over,
-// and the next launch runs the new files.
+// Releasing a change: bump VERSION (and APP_VERSION in js/version.js). On the next launch the app
+// notices the new worker, it installs, takes over, and app.js reloads the page once so the new
+// files show up straight away.
 
-const VERSION = 'holo-v0.1.0';
+const VERSION = 'holo-v0.1.1';
 const FILES = [
   './',
   'index.html',
@@ -18,6 +19,7 @@ const FILES = [
   'js/missions.js',
   'js/demo.js',
   'js/ui.js',
+  'js/version.js',
   'js/screens/timer.js',
   'js/screens/data.js',
   'js/screens/missions.js',
@@ -34,7 +36,11 @@ const FILES = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: 'reload' skips the browser's HTTP cache, so we never precache a stale copy of a file
+  // (GitHub Pages tells browsers to keep files for 10 minutes).
+  e.waitUntil(caches.open(VERSION)
+    .then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

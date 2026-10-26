@@ -104,6 +104,34 @@ function tick() {
   else if (ui.screen === 'data' && storage.getActiveSession() && now - lastSlow > 20_000) { lastSlow = now; renderNow(); }
 }
 
+/**
+ * Updates: every time the app opens or comes back to the foreground, ask the server whether sw.js
+ * changed. If it did, the new version installs in the background and takes over; we then reload
+ * once so the new code shows up immediately instead of on the launch after.
+ * The reload is safe mid-session: the timer is rebuilt from stored timestamps.
+ */
+function setupUpdates() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  const hadController = !!navigator.serviceWorker.controller; // false on the very first install
+  const openedAt = Date.now();
+  let pending = false;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    const check = () => reg.update().catch(() => { /* offline: try again next time */ });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      if (pending) location.reload(); // an update arrived while you were mid-use: apply it now
+      else check();
+    });
+  }).catch((e) => console.warn('SW registration failed', e));
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || pending) return;
+    // Right after launch (or while hidden): reload now. Otherwise wait until the app is next
+    // reopened, so a page reload never happens under your thumb.
+    if (document.hidden || Date.now() - openedAt < 15_000) location.reload();
+    else pending = true;
+  });
+}
+
 async function boot() {
   try {
     await storage.init();
@@ -118,9 +146,7 @@ async function boot() {
   setInterval(tick, 250);
   // Coming back to the app (phone unlocked, tab refocused): recompute from timestamps at once.
   document.addEventListener('visibilitychange', () => { if (!document.hidden) renderNow(); });
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW registration failed', e));
-  }
+  setupUpdates();
   window.holo = { storage, ctx, BASE_SIZE }; // handy in the console
 }
 

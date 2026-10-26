@@ -209,7 +209,6 @@ export function render(root, ctx) {
     <div class="date">${fmtDayLabel(new Date(now))}</div>
   </div>
   ${projectorSVG(m, t, tag, ctx, now)}
-  <div class="timer-spacer"></div>
   <div class="chips${picking ? ' pick' : ''}" role="group" aria-label="Tag">${chips}</div>
   <div class="actions">${controls}</div>`;
 
