@@ -17,7 +17,8 @@ js/stars.js             star glyph, grid projection, deterministic placement + g
 js/metrics.js           Mission Data cards (add new metrics here: write a card, push it into CARDS)
 js/missions.js          the 12 medals, computed from sessions
 js/demo.js              "Load demo data"
-js/ui.js                undo toast, icons
+js/ui.js                undo toast, swipe helper, icons
+js/sessionEditor.js     add / edit / delete sessions from the Day view
 js/version.js           app version shown in Settings (bump with sw.js VERSION)
 js/screens/*.js         timer, data (Day/Week/Month/Year), missions, settings
 fonts/                  Chakra Petch + IBM Plex Mono (OFL), self-hosted for offline
@@ -40,6 +41,11 @@ icons/                  app icons (icon.svg is the source)
 - **Medals.** Earned → the hex badge gets an amber dot. Opening Completed Missions clears the dot; NEW
   pills stay for that visit.
 - **Daily goal** is the thin amber arc under the Day total.
+- **Editing sessions.** On the Day view, tap a session to change its tag, start or end (or delete
+  it, with Undo); "+ Add session" logs one you forgot to time. Edits are events too, so they sync.
+  Stars take grid slots in creation order, so adding or editing never reshuffles the grid.
+- **Swipes** follow the tab bar order: Timer ← Day ← Week ← Month ← Year.
+- **Grid tilt** is one number: `ELEVATION` in `js/stars.js` (v0.2: 51.6°).
 - **No pop-ups anywhere.** Erase uses tap-twice; tag edits are inline.
 
 ## Test checklist (on the iPhone)

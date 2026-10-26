@@ -75,6 +75,7 @@ export function render(root, ctx) {
 
     <div class="label-cyan set-group">DATA &amp; SYNC</div>
     ${row('Cloud sync', 'Not connected yet', '<div class="status-pill"><i></i>LOCAL ONLY</div>')}
+    ${row('Saved on this device', '<span data-storage-info>Checking…</span>', '')}
     ${row('Export all data', 'Sessions, tags and settings as JSON', '<button type="button" class="btn-pill" data-act="export">EXPORT</button>')}
     ${row('Import data', 'Merges a JSON export (no duplicates)', '<button type="button" class="btn-pill" data-act="import">IMPORT</button><input type="file" accept="application/json,.json" data-import hidden>')}
     ${row('Load demo data', 'A realistic year of sessions, for trying things out', '<button type="button" class="btn-pill" data-act="demo">LOAD</button>')}
@@ -83,6 +84,14 @@ export function render(root, ctx) {
   </div>`;
 
   root.querySelector('.scroll').scrollTop = keep;
+  // Fill in the storage line (async). Shows how many sessions are saved, since when, and
+  // whether this is the Home Screen app, which keeps its data separate from Safari.
+  storage.storageInfo().then((i) => {
+    const el = root.querySelector('[data-storage-info]');
+    if (!el) return;
+    const since = i.oldest ? ` since ${new Date(i.oldest).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}` : '';
+    el.textContent = `${i.sessions} session${i.sessions === 1 ? '' : 's'}${since} · ${i.standalone ? 'Home Screen app' : 'browser tab (separate from the Home Screen app)'}${i.persisted ? ' · protected' : ''}`;
+  });
   const input = root.querySelector('[data-tagname]');
   if (input && focusEditor) { focusEditor = false; input.focus(); input.select(); }
 

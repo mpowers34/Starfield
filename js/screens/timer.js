@@ -9,7 +9,7 @@
 
 import { fmtHM, fmtClock, fmtTime, fmtDayLabel, startOfDay, addDays, MIN, esc, clamp } from '../util.js';
 import { chipStar, starBody, starOpacity } from '../stars.js';
-import { showToast } from '../ui.js';
+import { showToast, onSwipe } from '../ui.js';
 
 const RING_C = 2 * Math.PI * 118; // progress ring circumference (r = 118)
 let picking = false; // "Ask for a tag before starting": waiting for a chip tap
@@ -216,6 +216,9 @@ export function render(root, ctx) {
   if (ch) ch.scrollLeft = chipsScroll;
   lastText = { ...t, mode: m.mode, total: root.querySelector('#t-total').textContent };
   root.onclick = (e) => onClick(e, ctx);
+  // Swipe left anywhere on the timer (except the tag row and buttons) to open the Day view,
+  // mirroring the tab bar order: Timer | Day | Week | Month | Year.
+  onSwipe(root, (dir) => { if (dir === 'left') ctx.go('data', { scope: 'day', offset: 0 }); }, { ignore: '.chips, button' });
 }
 
 /** Cheap per-tick update: only text and the ring move. Re-render fully when the state changes. */

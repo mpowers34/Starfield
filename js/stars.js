@@ -1,16 +1,26 @@
 // stars.js — star glyphs, the holographic grid projection, and deterministic placement.
 //
-// Projection (taken from the mock-ups): the grid is the square u,w ∈ [-1, 1] on a ground
-// plane. A pinhole camera puts a ground point at depth z = D + w, and on screen at
-//   x = CX + F·u / z        y = Y0 + K / z
-// With D=5.5, F=742, K=3591, Y0=-484.5 the near edge lands at y=313.5 and the far edge at
-// y=68, inside a 390×294 viewBox that starts at y=30. Any N×N grid uses the same square,
-// so bigger grids simply have smaller cells — the "camera pulls back" effect.
-
+// Projection: a camera looks down at the grid (the square u,w ∈ [-1, 1] on the ground, w = far)
+// from ELEVATION degrees above the horizon, at distance CAM_R. For a ground point the camera
+// depth is z = D + w and the screen position is
+//   x = CX + FX·u / z        y = Y0 + K / z
+// with D = CAM_R/cos(e), FX = FOCAL/cos(e), K = FX·D·sin(e).
+// The mock-ups used ~61.6° (D=5.5, FX=742, K=3591). v0.2 lowers it ~10° toward a tabletop view,
+// which makes the grid shorter on screen without making it narrower.
+// To change the tilt, edit ELEVATION: everything else (viewBox, star bases) follows.
 import { seededShuffle, hashSeed, rng, clamp, MIN } from './util.js';
 import { sessionElapsed } from './storage.js';
 
-const D = 5.5, F = 742, K = 3591, Y0 = -484.5, CX = 195;
+const ELEVATION = 51.6;
+const CAM_R = 2.616, FOCAL = 352.9, CX = 195, FAR_Y = 68; // FAR_Y: where the back edge sits
+const e = (ELEVATION * Math.PI) / 180;
+const D = CAM_R / Math.cos(e), F = FOCAL / Math.cos(e), K = F * D * Math.sin(e);
+const Y0 = FAR_Y - K / (D + 1);
+export const NEAR_Y = Y0 + K / (D - 1);
+/** The grid's viewBox: room above the back edge for the label and back-row stars, a little below the front. */
+export const GRID_VIEW = { y: FAR_Y - 38, h: Math.round(NEAR_Y + 10.5 - (FAR_Y - 38)) };
+/** Base ellipses are circles lying on the ground, so they flatten as the view gets lower. */
+const ELLIPSE_RATIO = 0.5 * Math.sin(e) / Math.sin((61.6 * Math.PI) / 180);
 export const project = (u, w) => { const z = D + w; return { x: CX + (F * u) / z, y: Y0 + K / z, z }; };
 /** On-screen width of one cell at depth z for an N×N grid. */
 const cellWidth = (N, z) => (F * (2 / N)) / z;
@@ -214,7 +224,7 @@ export function renderGrid({ scope, key, sessions, tags, hidden = new Set(), acc
     const stem = big ? cw * 0.18 : cw * 0.26;
     const sy = p.y - stem;
     let g = '';
-    if (!big) g += `<ellipse cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" rx="${(cw * 0.22).toFixed(1)}" ry="${(cw * 0.11).toFixed(1)}" fill="rgba(90,215,255,0.1)" stroke="${color}" stroke-width="0.7" opacity="0.7"/>`;
+    if (!big) g += `<ellipse cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" rx="${(cw * 0.22).toFixed(1)}" ry="${(cw * 0.22 * ELLIPSE_RATIO).toFixed(1)}" fill="rgba(90,215,255,0.1)" stroke="${color}" stroke-width="0.7" opacity="0.7"/>`;
     g += `<line x1="${p.x.toFixed(1)}" y1="${p.y.toFixed(1)}" x2="${p.x.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="${color}" stroke-width="${big ? 0.5 : 0.7}" opacity="0.5"/>`;
     if (s === newest) g += `<circle class="${s === live ? 'live-ring' : ''}" cx="${p.x.toFixed(1)}" cy="${sy.toFixed(1)}" r="${Math.max(6, scale * 2).toFixed(1)}" fill="none" stroke="${accent}" stroke-width="1.2" stroke-dasharray="3 3"/>`;
     g += `<g transform="translate(${p.x.toFixed(1)} ${sy.toFixed(1)}) scale(${scale.toFixed(2)})" opacity="${starOpacity(mins).toFixed(2)}">${starBody(color)}</g>`;
@@ -226,8 +236,8 @@ export function renderGrid({ scope, key, sessions, tags, hidden = new Set(), acc
     ? `<circle cx="${330 + 13 * i}" cy="41" r="3.2" fill="${accent}"/>`
     : `<circle cx="${330 + 13 * i}" cy="41" r="2.6" fill="none" stroke="#8fa7bd" stroke-width="1" opacity="0.45"/>`)).join('');
 
-  return `<svg class="grid-svg" viewBox="0 30 390 294" role="img" aria-label="${label}">
-    ${starfield(`field:${scope}`, 46, 0, 30, 390, 294)}
+  return `<svg class="grid-svg" viewBox="0 ${GRID_VIEW.y} 390 ${GRID_VIEW.h}" style="aspect-ratio:390/${GRID_VIEW.h}" role="img" aria-label="${label}">
+    ${starfield(`field:${scope}`, 46, 0, GRID_VIEW.y, 390, GRID_VIEW.h)}
     <g stroke="#5ad7ff" stroke-width="${big ? 0.55 : 0.8}" opacity="${big ? 0.24 : 0.3}" fill="none">${lines}</g>
     <path d="${quad}" fill="rgba(90,215,255,0.04)" stroke="#5ad7ff" stroke-width="1.2" opacity="0.8"/>
     <g fill="#5ad7ff" opacity="0.32">${dots}</g>

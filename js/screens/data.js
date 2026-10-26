@@ -6,7 +6,8 @@ import { period, fmtHM, fmtDayLabel, MON, MON_LONG, addDays, MIN, esc } from '..
 import { renderGrid, chipStar } from '../stars.js';
 import { CARDS } from '../metrics.js';
 import { hasNew } from '../missions.js';
-import { ICONS } from '../ui.js';
+import { ICONS, onSwipe } from '../ui.js';
+import * as sessionEditor from '../sessionEditor.js';
 
 const SCOPES = ['day', 'week', 'month', 'year'];
 
@@ -52,8 +53,11 @@ export function render(root, ctx) {
   const accent = ctx.accent();
   const set = storage.getSettings();
 
+  // Close the session editor if you've moved to another day or view.
+  if (sessionEditor.isEditing() && (scope !== 'day' || sessionEditor.editor.dayStart !== p.start.getTime())) sessionEditor.close();
   const d = {
     period: p, sessions: shown, tags, elapsed, now, isCurrent,
+    editor: sessionEditor.editor, renderEditor: () => sessionEditor.renderEditor(storage),
     all: storage.listSessions({ includeActive: false }).filter((s) => !ui.hidden.has(s.tag_id)),
   };
   const cards = CARDS[scope];
@@ -79,7 +83,7 @@ export function render(root, ctx) {
     </div>
     <button type="button" class="btn-square" data-act="next" ${isCurrent ? 'disabled aria-label="Next, unavailable"' : `aria-label="Next ${scope}"`}>${ICONS.next}</button>
   </div>
-  <div class="grid-wrap">${renderGrid({ scope, key: p.key, sessions: inPeriod, tags, hidden: ui.hidden, accent, now, label: gridLabel })}</div>
+  <div class="grid-wrap">${renderGrid({ scope, key: p.key, sessions: placementOrder(inPeriod), tags, hidden: ui.hidden, accent, now, label: gridLabel })}</div>
   <div class="mission">
     <div class="mission-head"><div class="label">MISSION DATA</div><div class="label">DISPLAYING: ${cards.length} METRIC${cards.length === 1 ? '' : 'S'}</div></div>
     <div class="scroll">${cardsHTML}</div>
@@ -104,6 +108,7 @@ export function render(root, ctx) {
   root.onclick = (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (sessionEditor.handleClick(e, ctx, p.start.getTime())) return;
     if (b.dataset.filter) { ctx.toggleHidden(b.dataset.filter); return; }
     if (b.dataset.scope) { ctx.go('data', { scope: b.dataset.scope }); return; }
     switch (b.dataset.act) {
@@ -114,25 +119,29 @@ export function render(root, ctx) {
       default: break;
     }
   };
+  root.oninput = sessionEditor.handleInput;
   attachSwipe(root.querySelector('.grid-wrap'), ctx);
 }
 
 /**
- * Swipe across the grid to switch views: right → the next-smaller scope (Year → Month → Week → Day),
- * left → the next-bigger one (Day → Week → …). Stops at the ends. To move within a scope
+ * Stars take grid slots in the order sessions were CREATED, not by start time. So adding a
+ * forgotten session or editing a start time never shuffles the stars already on the grid;
+ * the new one simply takes the next free slot.
+ */
+function placementOrder(list) {
+  const key = (s) => s.created_at || s.started_at;
+  return [...list].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+}
+
+/**
+ * Swipe across the grid to move along the tab bar: right → one tab left (Year → Month → Week →
+ * Day → Timer), left → one tab right (Day → Week → Month → Year). To move within a scope
  * (e.g. 2026 → 2025), use the arrows at the top.
  */
 function attachSwipe(el, ctx) {
-  let x0 = null;
-  let y0 = null;
-  el.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
-  el.addEventListener('touchend', (e) => {
-    if (x0 == null) return;
-    const dx = e.changedTouches[0].clientX - x0;
-    const dy = e.changedTouches[0].clientY - y0;
-    x0 = null;
-    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return; // a tap or a vertical scroll, not a swipe
-    const i = SCOPES.indexOf(ctx.ui.scope) + (dx > 0 ? -1 : 1);
-    if (i >= 0 && i < SCOPES.length) ctx.go('data', { scope: SCOPES[i] });
-  }, { passive: true });
+  onSwipe(el, (dir) => {
+    const i = SCOPES.indexOf(ctx.ui.scope) + (dir === 'right' ? -1 : 1);
+    if (i < 0) ctx.go('timer');
+    else if (i < SCOPES.length) ctx.go('data', { scope: SCOPES[i] });
+  });
 }

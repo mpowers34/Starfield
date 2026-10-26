@@ -199,7 +199,7 @@ body.reduce-motion .paused .digits, body.reduce-motion .chips.pick .chip { anima
 .hex-badge { position: relative; flex: none; width: 40px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--cyan); cursor: pointer; }
 .hex-badge .dot { position: absolute; top: 1px; right: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 .grid-wrap { flex: none; margin: 0 calc(-1 * var(--pad-x)); }
-.grid-svg { display: block; width: 100%; max-width: 390px; height: auto; aspect-ratio: 390 / 294; margin: 0 auto; }
+.grid-svg { display: block; width: 100%; max-width: 390px; height: auto; margin: 0 auto; } /* aspect ratio set inline from the projection */
 .mission { display: flex; flex-direction: column; flex: 1; min-height: 0; margin-top: 6px; }
 .mission-head { display: flex; justify-content: space-between; align-items: baseline; }
 .mission-head .label:last-child { letter-spacing: .12em; }
@@ -237,6 +237,12 @@ body.reduce-motion .paused .digits, body.reduce-motion .chips.pick .chip { anima
 .bar.amber > div { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 .brow .val { width: 66px; text-align: right; font-size: 16px; font-weight: 600; color: var(--bright); font-variant-numeric: tabular-nums; }
 .brow.compact { height: 38px; }
+.brow.tight { height: 34px; }
+.brow.tight .lab { width: 72px; }
+.tagrow-bar .lab.tag { width: 104px; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tagrow-bar .lab.tag .a { font-family: var(--display); font-size: 14px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tagrow-bar .val { width: 76px; }
+.tagrow-bar .val small { font-family: var(--mono); font-size: 10px; color: var(--dim); font-weight: 400; }
 .brow.compact .lab { width: 78px; }
 .brow.compact .val { width: 48px; }
 .brow.future .lab .a { color: var(--dim); }
@@ -309,3 +315,26 @@ body.reduce-motion .paused .digits, body.reduce-motion .chips.pick .chip { anima
 /* Short screens: give Mission Data room by shrinking the star grid a little. */
 @media (max-height: 760px) { .grid-svg { max-width: 330px; } }
 @media (max-height: 680px) { .grid-svg { max-width: 280px; } .tabbar { height: 46px; margin-top: 8px; } .chip.filter { height: 36px; } }
+
+/* ---------- Session editor (Day view) ---------- */
+button.lrow.sess { width: 100%; padding: 0; border: 0; border-bottom: 1px solid var(--hair); background: transparent; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+button.lrow.sess .pencil { flex: none; color: var(--faint); margin-left: -4px; }
+button.lrow.sess.open { border-bottom-color: transparent; }
+button.lrow.sess.open .pencil { color: var(--cyan); }
+.sess-editor { margin: 0 0 8px; padding: 10px 12px 12px; border: 1px solid rgba(90, 215, 255, .45); border-radius: 14px; background: rgba(90, 215, 255, .05); }
+.sess-editor .ed-chips { margin-right: 0; padding-right: 0; -webkit-mask-image: none; mask-image: none; gap: 6px; }
+.chip.mini { height: 34px; min-width: 0; padding: 0 10px; gap: 5px; border-radius: 10px; font-size: 13px; }
+.ed-times { display: flex; align-items: flex-end; gap: 12px; margin-top: 10px; }
+.ed-times label { display: flex; flex-direction: column; gap: 4px; }
+.ed-times input[type="time"] {
+  height: 40px; min-width: 100px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line);
+  background: rgba(3, 5, 10, .6); color: var(--bright); font-family: var(--display); font-size: 17px; font-weight: 500;
+  color-scheme: dark; -webkit-appearance: none; appearance: none; -webkit-user-select: text; user-select: text;
+}
+.ed-live { height: 40px; display: flex; align-items: center; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--accent); }
+.ed-dur { flex: 1; min-width: 0; white-space: nowrap; text-align: right; padding-bottom: 10px; font-family: var(--mono); font-size: 12px; color: var(--dim); }
+.ed-error { margin-top: 8px; font-family: var(--mono); font-size: 11px; color: #ff9db8; letter-spacing: .04em; }
+.ed-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.btn-pill.ghost { color: var(--dim); border-color: var(--line); }
+.btn-pill.solid { background: rgba(90, 215, 255, .14); }
+.add-session { margin: 8px 0 4px; height: 40px; }

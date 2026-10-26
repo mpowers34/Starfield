@@ -101,7 +101,7 @@ let lastSlow = 0;
 function tick() {
   const now = Date.now();
   if (ui.screen === 'timer') timer.tick(now, ctx);
-  else if (ui.screen === 'data' && storage.getActiveSession() && now - lastSlow > 20_000) { lastSlow = now; renderNow(); }
+  else if (ui.screen === 'data' && storage.getActiveSession() && now - lastSlow > 20_000 && !document.querySelector('.sess-editor')) { lastSlow = now; renderNow(); }
 }
 
 /**
@@ -140,6 +140,7 @@ async function boot() {
     console.error(err);
     return;
   }
+  storage.requestPersistence();
   renderBackdrop();
   storage.subscribe(renderSoon);
   show();

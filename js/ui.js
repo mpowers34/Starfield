@@ -13,6 +13,33 @@ export function showToast(text, { action, onAction, ms = 4000 } = {}) {
   toastTimer = setTimeout(() => { host.innerHTML = ''; }, ms);
 }
 
+/**
+ * Call cb('left' | 'right') when a horizontal swipe ends on el. Taps, short drags and vertical
+ * scrolls are ignored, as are swipes that START on an element matching `ignore` (e.g. the
+ * sideways-scrolling tag row). Safe to call on every render: it replaces, never stacks, handlers.
+ */
+export function onSwipe(el, cb, { ignore = null } = {}) {
+  if (!el) return;
+  if (el._swipe) { el.removeEventListener('touchstart', el._swipe.start); el.removeEventListener('touchend', el._swipe.end); }
+  let x0 = null;
+  let y0 = null;
+  const start = (e) => {
+    if (e.touches.length !== 1 || (ignore && e.target.closest(ignore))) { x0 = null; return; }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  };
+  const end = (e) => {
+    if (x0 == null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    const dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.8) return;
+    cb(dx > 0 ? 'right' : 'left');
+  };
+  el.addEventListener('touchstart', start, { passive: true });
+  el.addEventListener('touchend', end, { passive: true });
+  el._swipe = { start, end };
+}
+
 export const ICONS = {
   back: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   next: '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',

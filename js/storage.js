@@ -71,7 +71,9 @@ function openDB() {
 
 function tx(store, mode, fn) {
   return new Promise((resolve, reject) => {
-    const t = db.transaction(store, mode);
+    // 'strict' asks the browser to flush to disk before reporting success, so a session survives
+    // even if the app is swiped away right after tapping End.
+    const t = db.transaction(store, mode, mode === 'readwrite' ? { durability: 'strict' } : undefined);
     const s = t.objectStore(store);
     const out = fn(s);
     t.oncomplete = () => resolve(out && 'result' in out ? out.result : undefined);
@@ -147,10 +149,10 @@ function applyEvent(e) {
       state.settings[p.key] = p.value;
       break;
     case 'session_started':
-      S.set(e.entity_id, { id: e.entity_id, tag_id: p.tag_id, planned_minutes: p.planned_minutes ?? null, started_at: p.started_at || e.occurred_at, ended_at: null, pauses: [], deleted_at: null, device_id: e.device_id });
+      S.set(e.entity_id, { id: e.entity_id, tag_id: p.tag_id, planned_minutes: p.planned_minutes ?? null, started_at: p.started_at || e.occurred_at, ended_at: null, pauses: [], deleted_at: null, device_id: e.device_id, created_at: e.occurred_at });
       break;
     case 'session_logged': // a complete past session in one event (demo data, manual entry, imports from other apps)
-      S.set(e.entity_id, { id: e.entity_id, tag_id: p.tag_id, planned_minutes: p.planned_minutes ?? null, started_at: p.started_at, ended_at: p.ended_at, pauses: p.pauses || [], deleted_at: null, device_id: e.device_id });
+      S.set(e.entity_id, { id: e.entity_id, tag_id: p.tag_id, planned_minutes: p.planned_minutes ?? null, started_at: p.started_at, ended_at: p.ended_at, pauses: p.pauses || [], deleted_at: null, device_id: e.device_id, created_at: e.occurred_at, manual: !!p.manual });
       break;
     case 'session_paused':
       if (s && !s.ended_at && !openPause(s)) s.pauses.push({ start: p.at || e.occurred_at, end: null });
@@ -176,6 +178,18 @@ function applyEvent(e) {
       break;
     case 'session_deleted':
       if (s) s.deleted_at = e.occurred_at;
+      break;
+    case 'session_edited': // a correction from the Day view editor: any of tag_id, started_at, ended_at, pauses
+      if (s) {
+        const f = p.fields || {};
+        if ('tag_id' in f) s.tag_id = f.tag_id;
+        if ('started_at' in f) s.started_at = f.started_at;
+        if ('ended_at' in f && s.ended_at) s.ended_at = f.ended_at; // never ends a live session
+        if ('pauses' in f) s.pauses = f.pauses.map((x) => ({ ...x }));
+      }
+      break;
+    case 'session_restored': // Undo delete
+      if (s) s.deleted_at = null;
       break;
     default:
       // Unknown types (from a newer app version) are kept in the log and ignored here.
@@ -283,6 +297,43 @@ export function retagSession(id, tagId) {
 }
 
 export function deleteSession(id) { append(makeEvent('session_deleted', id, {})); }
+export function restoreSession(id) { append(makeEvent('session_restored', id, {})); }
+
+/** Add a finished session by hand (e.g. you forgot to start the timer). Returns the session. */
+export function addSession({ tagId, startedAt, endedAt }) {
+  const id = uuid();
+  append(makeEvent('session_logged', id, { tag_id: tagId, planned_minutes: null, started_at: startedAt, ended_at: endedAt, pauses: [], manual: true }));
+  return state.sessions.get(id);
+}
+
+/**
+ * Correct a session. fields may hold tag_id, started_at, ended_at (finished sessions only).
+ * Changing the times drops pauses outside the new range, so what you type is what counts.
+ */
+export function editSession(id, fields) {
+  const s = state.sessions.get(id);
+  if (!s) return;
+  const f = { ...fields };
+  if ('started_at' in f || 'ended_at' in f) {
+    const st = f.started_at || s.started_at;
+    const en = f.ended_at || s.ended_at; // null for a live session
+    f.pauses = s.pauses.filter((x) => x.start >= st && (!en || (x.end && x.end <= en)));
+  }
+  append(makeEvent('session_edited', id, { fields: f }));
+}
+
+/** The first other session that overlaps [startISO, endISO), or null. endISO null = still running. */
+export function findOverlap(startISO, endISO, excludeId = null, now = Date.now()) {
+  const a = Date.parse(startISO);
+  const b = endISO ? Date.parse(endISO) : now;
+  for (const s of state.sessions.values()) {
+    if (s.deleted_at || s.id === excludeId) continue;
+    const sa = Date.parse(s.started_at);
+    const sb = s.ended_at ? Date.parse(s.ended_at) : now;
+    if (a < sb && b > sa) return s;
+  }
+  return null;
+}
 
 /** Bulk-add finished sessions (demo data). Each: {tag_id, started_at, ended_at, planned_minutes, pauses}. */
 export function logSessions(list) {
@@ -354,6 +405,21 @@ export async function eraseAll() {
   await tx('events', 'readwrite', (s) => s.clear());
   rebuild();
   seedDefaults();
+}
+
+/** Where data lives and whether the browser promised to keep it. Shown in Settings › Data. */
+export async function storageInfo() {
+  let persisted = null;
+  try { persisted = navigator.storage?.persisted ? await navigator.storage.persisted() : null; } catch { /* unsupported */ }
+  const all = [...state.sessions.values()].filter((x) => !x.deleted_at && x.ended_at);
+  const oldest = all.reduce((m, x) => (!m || x.started_at < m ? x.started_at : m), null);
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  return { persisted, sessions: all.length, oldest, standalone, events: events.length };
+}
+
+/** Ask the browser not to clear our data under storage pressure (granted to Home Screen apps). */
+export async function requestPersistence() {
+  try { if (navigator.storage?.persist && !(await navigator.storage.persisted())) await navigator.storage.persist(); } catch { /* ignore */ }
 }
 
 /** For debugging in the console: window.holo.storage.debug() */

@@ -53,19 +53,27 @@ function byHour(d) {
 
 // ---------- Day ----------
 
+const PENCIL = '<svg class="pencil" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M9.6 2.2l2.2 2.2-7 7H2.6V9.2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
+
 const daySessions = {
   id: 'day-sessions',
   title: 'HOUR BY HOUR · SESSIONS',
+  // Tap a session to correct its tag or times (inline editor); "+ ADD SESSION" logs a forgotten one.
   render(d) {
-    if (!d.sessions.length) return empty(d.isCurrent ? 'NO STARS YET TODAY · START ONE FROM THE TIMER' : 'NO FOCUS THIS DAY');
-    return d.sessions.map((s) => {
+    const ed = d.editor;
+    const rows = d.sessions.map((s) => {
       const live = !s.ended_at;
       const ms = d.elapsed(s);
       const range = live ? `${fmtTime(new Date(s.started_at))} – now` : fmtRange(new Date(s.started_at), new Date(s.ended_at));
-      return `<div class="lrow">${starIcon(tagColor(d, s), ms / MIN, { ring: live })}
+      const open = ed.open === s.id;
+      return `<button type="button" class="lrow sess${open ? ' open' : ''}" data-edit-session="${s.id}" aria-expanded="${open}" aria-label="Edit ${esc(tagName(d, s))} session, ${range}">${starIcon(tagColor(d, s), ms / MIN, { ring: live })}
         <div class="grow"><div class="name">${esc(tagName(d, s))}</div><div class="meta">${range}</div></div>
-        ${live ? '<span class="pill">LIVE</span>' : ''}<div class="val">${fmtHM(ms)}</div></div>`;
+        ${live ? '<span class="pill">LIVE</span>' : ''}<div class="val">${fmtHM(ms)}</div>${PENCIL}</button>${open ? d.renderEditor() : ''}`;
     }).join('');
+    const none = d.sessions.length ? '' : empty(d.isCurrent ? 'NO STARS YET TODAY · START ONE FROM THE TIMER' : 'NO FOCUS THIS DAY');
+    const adding = ed.open === 'new';
+    return `${rows}${none}${adding ? d.renderEditor() : ''}
+      <button type="button" class="new-tag add-session" data-act="add-session" aria-expanded="${adding}">${adding ? 'ADDING A SESSION' : '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v11M1.5 7h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>ADD SESSION'}</button>`;
   },
 };
 
@@ -144,7 +152,7 @@ const monthWeeks = {
       const cur = now >= r.a && now < addDays(r.b, 1);
       const future = r.a > now;
       const lab = `${MON[r.a.getMonth()]} ${r.a.getDate()}${r.b.getDate() !== r.a.getDate() ? `–${r.b.getDate()}` : ''}`;
-      return `<div class="brow${future ? ' future' : ''}"><div class="lab"><div class="a${cur ? ' accent' : ''}">${lab}</div><div class="b">${r.list.length} star${r.list.length === 1 ? '' : 's'}</div></div>
+      return `<div class="brow tight${future ? ' future' : ''}"><div class="lab"><div class="a${cur ? ' accent' : ''}">${lab}</div></div>
         <div class="bar${cur ? ' amber' : ''}"><div style="width:${Math.round((r.ms / max) * 100)}%"></div></div>
         <div class="val${cur ? ' accent' : ''}">${future ? '—' : fmtHM(r.ms)}</div></div>`;
     }).join('');
@@ -242,20 +250,28 @@ const yearChart = {
   },
 };
 
-const yearMonths = {
-  id: 'year-months',
-  title: 'MONTH BY MONTH',
+/** Hours per tag for the period, longest first, each bar in its tag's color. */
+const tagBreakdown = {
+  id: 'tag-hours',
+  title: 'HOURS BY TAG',
   render(d) {
-    const ms = byMonth(d);
-    const max = Math.max(1, ...ms.map((m) => m.ms));
-    const now = new Date(d.now);
-    const curM = d.period.start.getFullYear() === now.getFullYear() ? now.getMonth() : -1;
-    return ms.map((m, i) => {
-      const cur = i === curM;
-      const future = d.period.start.getFullYear() > now.getFullYear() || (curM >= 0 && i > curM);
-      return `<div class="brow compact${future ? ' future' : ''}"><div class="lab"><span class="a${cur ? ' accent' : ''}">${MON[i]}</span><span class="b"> ${future ? '' : `${m.n}★`}</span></div>
-        <div class="bar${cur ? ' amber' : ''}"><div style="width:${Math.round((m.ms / max) * 100)}%"></div></div>
-        <div class="val${cur ? ' accent' : ''}">${future ? '—' : fmtHShort(m.ms)}</div></div>`;
+    const by = new Map();
+    for (const s of d.sessions) {
+      const e = by.get(s.tag_id) || { ms: 0, n: 0 };
+      e.ms += d.elapsed(s); e.n++;
+      by.set(s.tag_id, e);
+    }
+    if (!by.size) return empty('NOTHING LOGGED YET');
+    const rows = [...by].sort((a, b) => b[1].ms - a[1].ms);
+    const max = rows[0][1].ms || 1;
+    const total = rows.reduce((a, [, e]) => a + e.ms, 0) || 1;
+    return rows.map(([id, e]) => {
+      const t = d.tags.get(id);
+      const color = t?.color || '#8fa7bd';
+      return `<div class="brow tight tagrow-bar">
+        <div class="lab tag">${starIcon(color, 60, { box: 18 })}<span class="a">${esc(t?.name || 'Untagged')}</span></div>
+        <div class="bar"><div style="width:${Math.round((e.ms / max) * 100)}%;background:${color};box-shadow:0 0 10px ${color}"></div></div>
+        <div class="val">${fmtHShort(e.ms)}<small> ${Math.round((e.ms / total) * 100)}%</small></div></div>`;
     }).join('');
   },
 };
@@ -264,7 +280,7 @@ const yearMonths = {
 export const CARDS = {
   day: [daySessions],
   week: [weekDays, weekHours],
-  month: [monthWeeks, monthHeat, monthStats],
-  year: [yearChart, yearMonths],
+  month: [monthHeat, monthWeeks, monthStats],
+  year: [yearChart, tagBreakdown],
 };
 
